@@ -1,0 +1,13 @@
+---
+title: "linear_models"
+output: github_document
+author: "Yang Gao"
+---
+
+```{r}
+library(tidyverse)
+library(p8105.datasets)
+
+set.seed(1)
+```
+
