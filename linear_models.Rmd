@@ -11,3 +11,98 @@ library(p8105.datasets)
 set.seed(1)
 ```
 
+load NYC Airbnb data
+```{r}
+data("nyc_airbnb")
+
+nyc_airbnb = 
+  nyc_airbnb %>% 
+  mutate (stars = review_scores_location / 2) %>% 
+  rename(boro = neighbourhood_group)%>% 
+  filter(boro != "Staten Island") %>% 
+  select(price, stars, boro, neighbourhood, room_type)
+  
+```
+
+
+linear model
+```{r}
+fit = lm(price ~ stars + boro, data = nyc_airbnb)
+```
+
+```{r}
+summary(fit)
+summary(fit)$coef
+```
+
+```{r}
+fit %>% 
+  broom::tidy() %>% 
+  select(term, estimate, p.value) %>% 
+  mutate(term = str_replace(term, "^boro", "Borough: ")) %>% 
+  knitr::kable(digits = 3)
+
+```
+
+```{r}
+modelr::add_residuals(nyc_airbnb, fit) %>% 
+  ggplot(aes(x = resid)) +
+  geom_density() +
+  xlim (200,200)
+  
+```
+
+
+```{r}
+fit = lm(price ~ stars + room_type, data = nyc_airbnb)
+
+broom::tidy(fit) 
+```
+
+let's try nesting
+```{r}
+nyc_airbnb %>% 
+  relocate(boro) %>% 
+  nest(data = price:room_type) %>% 
+  mutate(
+    lm_fits = map(data, ~lm(price ~ stars + room_type, data =.x)),
+    lm_results = map(lm_fits, broom::tidy)
+  ) %>% 
+  select(boro, lm_results)
+
+
+```
+
+```{r}
+manhattan_airbnb =
+  nyc_airbnb %>% 
+  filter(boro == "Manhattan")
+
+manhattan_nest_lm_res =
+  manhattan_airbnb %>% 
+  nest(data = -neighbourhood) %>% 
+  mutate(
+    models = map(data, ~lm(price ~ stars + room_type, data = .x)),
+    results = map(models, broom::tidy)) %>% 
+  select(-data, -models) %>% 
+  unnest(results)
+```
+
+```{r}
+manhattan_nest_lm_res %>% 
+  filter ( term =="stars") %>% 
+  ggplot ( aes(x = estimate)) + 
+  geom_density()
+```
+
+
+```{r}
+manhattan_nest_lm_res %>% 
+  filter(str_detect(term, "room_type")) %>% 
+  ggplot(aes(x = neighbourhood, y = estimate)) + 
+  geom_point() + 
+  facet_wrap(~term) + 
+  theme(axis.text.x = element_text(angle = 80, hjust = 1))
+```
+
+
