@@ -25,7 +25,7 @@ nyc_airbnb =
 ```
 
 
-linear model
+linear model:`price` as an outcome that may depend on rating and borough
 ```{r}
 fit = lm(price ~ stars + boro, data = nyc_airbnb)
 ```
@@ -34,6 +34,22 @@ fit = lm(price ~ stars + boro, data = nyc_airbnb)
 summary(fit)
 summary(fit)$coef
 ```
+
+changing reference group using `fct_infreq`
+
+```{r}
+nyc_airbnb = 
+  nyc_airbnb %>% 
+  mutate(
+    boro = fct_infreq(boro),
+    room_type = fct_infreq(room_type))
+
+fit_2 = lm(price ~ stars + boro, data = nyc_airbnb)
+
+summary(fit_2)$coef
+
+```
+
 
 ```{r}
 fit %>% 
@@ -44,14 +60,15 @@ fit %>%
 
 ```
 
+
+Diagnostics
 ```{r}
 modelr::add_residuals(nyc_airbnb, fit) %>% 
   ggplot(aes(x = resid)) +
   geom_density() +
-  xlim (200,200)
+  xlim (-200,200)
   
 ```
-
 
 ```{r}
 fit = lm(price ~ stars + room_type, data = nyc_airbnb)
@@ -69,8 +86,6 @@ nyc_airbnb %>%
     lm_results = map(lm_fits, broom::tidy)
   ) %>% 
   select(boro, lm_results)
-
-
 ```
 
 ```{r}
@@ -82,7 +97,7 @@ manhattan_nest_lm_res =
   manhattan_airbnb %>% 
   nest(data = -neighbourhood) %>% 
   mutate(
-    models = map(data, ~lm(price ~ stars + room_type, data = .x)),
+    models = map(.x = data, ~lm(price ~ stars + room_type, data = .x)),
     results = map(models, broom::tidy)) %>% 
   select(-data, -models) %>% 
   unnest(results)
@@ -103,6 +118,35 @@ manhattan_nest_lm_res %>%
   geom_point() + 
   facet_wrap(~term) + 
   theme(axis.text.x = element_text(angle = 80, hjust = 1))
+```
+
+
+```{r}
+new_nyc_airbnb = nyc_airbnb %>% 
+  mutate(expensive_apt = as.numeric(price > 500)) 
+```
+
+```{r}
+logistic_fit = 
+  glm (
+    expensive_apt ~ stars + boro,
+    data = new_nyc_airbnb,
+    family = binomial())
+
+logistic_fit %>% 
+  broom::tidy() %>% 
+  mutate(
+    term = str_replace(term, "boro","Boro: "),
+    estimate = exp(estimate)
+  ) %>% 
+  select(term, OR = estimate, p.value)
+```
+
+
+```{r}
+new_nyc_airbnb %>% 
+  modelr::add_predictions(logistic_fit) %>% 
+  mutate (pred = boot::inv.logit(pred))
 ```
 
 
